@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cruising with Banyan – Trip Weather</title>
+<style>
+:root{--bg:#f3f6fa;--card:#fff;--tx:#14202e;--mut:#6b7a8c;--ac:#0a7ea4;--ac2:#e6f4f9;--bd:#e0e6ed;--wn:#fff4e0;--wt:#8a5a00}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1620;--card:#18232f;--tx:#e8eef5;--mut:#92a1b3;--ac:#4cc3e8;--ac2:#18323f;--bd:#27364a;--wn:#3a2e12;--wt:#f2c46b}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+#app{max-width:440px;margin:0 auto;min-height:100vh;padding-bottom:40px}
+.brand{text-align:center;padding:12px 16px 4px;font-weight:700;font-size:15px;letter-spacing:.06em;color:var(--ac)}
+header{position:sticky;top:env(safe-area-inset-top,0);background:var(--bg);padding:8px 12px;display:flex;align-items:center;gap:6px;z-index:5;border-bottom:1px solid var(--bd)}
+header h1{font-size:19px;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button{font:inherit;color:inherit;cursor:pointer}
+.ib{background:none;border:0;font-size:19px;padding:4px 8px;color:var(--ac)}
+.pri{background:var(--ac);color:#fff;border:0;border-radius:12px;padding:12px 16px;font-weight:600;width:100%;margin-top:8px}
+.sec{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:11px 14px;width:100%;margin-top:8px}
+.lnk{background:none;border:0;color:var(--ac);padding:6px 0;font-weight:600}
+.wrap{padding:12px 14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;position:relative}
+.col{display:block}.col .x{position:absolute;right:6px;top:6px;color:var(--mut)}
+.d{min-width:46px;text-align:center;font-size:12px;color:var(--mut);line-height:1.2}.d b{display:block;font-size:20px;color:var(--tx)}
+.m{flex:1;min-width:0}.loc{font-weight:600}.sub{font-size:13px;color:var(--mut)}.t{text-align:right}.hi{font-weight:700}.lo{color:var(--mut)}
+.na{background:var(--wn)}.na .sub,.wn{color:var(--wt)}.wn{font-size:13px;margin:-4px 0 8px}
+.note{background:var(--ac2);border-radius:10px;padding:10px 12px;font-size:13px;margin:8px 0}
+h2{font-size:14px;color:var(--mut);margin:16px 4px 6px;font-weight:600}
+.hr{display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--bd)}.hr .tm{width:52px;color:var(--mut);font-size:14px}.hr .ic{width:28px;font-size:20px}.hr .tp{font-weight:700;width:46px}.hr .x{color:var(--mut);font-size:13px;flex:1;text-align:right}
+.hrs{position:relative;max-height:340px;overflow-y:auto;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:0 8px}.inport{background:var(--ac2);border-radius:8px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}.stat{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px;text-align:center}.stat small{display:block;color:var(--mut);font-size:12px}
+input,select,textarea{font:inherit;width:100%;padding:11px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);margin:4px 0 8px}
+label{font-size:13px;color:var(--mut)}.row{display:flex;gap:8px}.row>*{flex:1}
+.seg{display:flex;background:var(--ac2);border-radius:10px;padding:3px;margin:8px 0;gap:2px}.seg button{flex:1;border:0;background:none;padding:8px 4px;border-radius:8px;font-weight:600;color:var(--mut);min-width:0}.seg .on{background:var(--card);color:var(--ac)}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0));transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:20}
+.ctr{text-align:center;color:var(--mut);padding:24px 8px}
+</style></head><body><div id="app"></div>
+<script>
+const $=s=>document.querySelector(s),LS=localStorage;
+const st=k=>{try{return JSON.parse(LS.getItem(k))}catch(e){return null}},sv=(k,v)=>{try{LS.setItem(k,JSON.stringify(v))}catch(e){}};
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let trips=st('tw_trips')||[],unit=st('tw_unit')||'F',view='list',cur=null,di=0,si=0,tr=null,shared=false,busy='',fc={};
+const IC=c=>c==0?'☀️':c<3?'⛅':c==3?'☁️':c<50?'🌫️':c<70?'🌧️':c<80?'🌨️':c<90?'🌦️':'⛈️';
+const T=v=>Math.round(unit=='F'?v:(v-32)*5/9),W=v=>unit=='F'?Math.round(v)+' mph':Math.round(v*1.609)+' km/h';
+const pad=n=>String(n).padStart(2,'0'),iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const addD=(s,n)=>{const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return iso(d)};
+const fmtD=s=>new Date(s+'T12:00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+const hr=h=>(h%12||12)+(h<12?' AM':' PM'),tl=s=>s.t&&!s.sea?(s.from==s.to?hr(s.from):hr(s.from)+' – '+hr(s.to)):'';
+const toast=m=>{const e=document.createElement('div');e.className='toast';e.textContent=m;document.body.appendChild(e);setTimeout(()=>e.remove(),2200)};
+/* ---------- itinerary reader ---------- */
+const MON='jan feb mar apr may jun jul aug sep oct nov dec'.split(' ');
+const DRE=/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?[\s\/]+(\d{1,2})(?:[\s,\/]+(\d{4}))?/i;
+const LDRE=/^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?[\s\/]+\d{1,2}(?:[\s,\/]+\d{4})?)[\s:,\-–]+([A-Za-z].*)$/i;
+const TRE=/(\d{1,2}):(\d{2})\s*([AP])M/gi;
+function pdate(s,yr){const m=s.match(DRE);return m?(m[3]||yr)+'-'+pad(MON.indexOf(m[1].toLowerCase().slice(0,3))+1)+'-'+pad(+m[2]):null}
+const times=s=>[...s.matchAll(TRE)].map(m=>(+m[1]%12)+(m[3].toUpperCase()=='P'?12:0));
+function parse(txt,sd){
+ const L=txt.split(/\r?\n/).map(s=>s.trim()).filter(Boolean),yr=(sd||iso(new Date())).slice(0,4),WD=/^(mon|tue|wed|thu|fri|sat|sun)[a-z]*$/i;
+ let ent=[],head=[],o=null,m;
+ for(let i=0;i<L.length;i++){const l=L[i];
+  if(WD.test(l))continue;
+  if(m=l.match(/^day\s*(\d+)\s*[-–:.]\s*(.+)$/i)){o={n:+m[1],p:m[2],b:[]};ent.push(o)}
+  else if(/^\d{1,2}$/.test(l)&&L[i+1]&&!/^\d/.test(L[i+1])){o={n:+l,p:L[++i],b:[]};ent.push(o)}
+  else if(m=l.match(LDRE)){o={p:m[2],d:pdate(m[1],yr),b:[]};ent.push(o)}
+  else if(o)o.b.push(l);else head.push(l)}
+ let name=(head[0]||'My trip').replace(DRE,'').replace(/[,:\s]+$/,'').trim()||'My trip';
+ if(!ent.length){ent=L.filter(l=>!WD.test(l)).map(p=>({p,b:[]}));name='My trip'}
+ ent.forEach(e=>{if(!e.d&&e.n){const d=pdate(e.b.join(' '),yr);if(d)e.d=d}});
+ let base=pdate(head.join(' '),yr);const f=ent.find(e=>e.d&&e.n);if(f)base=addD(f.d,1-f.n);if(sd)base=sd;
+ const days=ent.map((e,i)=>{
+  const d=e.d||(e.n&&base?addD(base,e.n-1):addD(sd||iso(new Date()),i)),t=times(e.p+' '+e.b.join(' '));
+  let p=e.p.split(/\t|\s{2,}/)[0].replace(TRE,'').replace(/\s*[-–]\s*(depart|arriv).*$/i,'').trim();
+  const sea=/at sea|cruising|sea day/i.test(p);
+  return{date:d,stops:[{loc:sea?'At sea':p,sea,t:t.length?1:0,from:t.length?t[0]:sea?7:8,to:t.length?t[t.length-1]:sea?7:18}]}});
+ return{name,days}}
+async function geo(p){const q=p.replace(/\(.*?\)/g,'').split(',')[0].trim();if(!q)return[];
+ try{const r=await(await fetch('https://geocoding-api.open-meteo.com/v1/search?count=6&name='+encodeURIComponent(q))).json(),h=p.toLowerCase();
+  return(r.results||[]).map(x=>({n:[x.name,x.admin1,x.country].filter(Boolean).join(', '),lat:x.latitude,lon:x.longitude,s:[x.country,x.admin1,x.country_code].some(v=>v&&h.includes(v.toLowerCase()))?1:0})).sort((a,b)=>b.s-a.s)}catch(e){return[]}}
+function pick(s,k){s.i=k;const c=(s.c||[])[k];s.lat=c?c.lat:null;s.lon=c?c.lon:null}
+async function relocate(i,j,v){const s=tr.days[i].stops[j];s.loc=v;s.sea=/at sea/i.test(v);if(s.sea){s.lat=s.lon=null;s.c=[]}else{s.c=await geo(v);pick(s,0)}render()}
+/* ---------- forecast ---------- */
+const key=p=>p?p[0].toFixed(2)+','+p[1].toFixed(2):'';
+async function load(lat,lon){const k=key([lat,lon]);if(fc[k])return;
+ try{const j=await(await fetch('https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+'&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,uv_index_max,sunrise,sunset&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m&forecast_days=16&timezone=auto&temperature_unit=fahrenheit&wind_speed_unit=mph')).json();
+  if(j.daily){fc[k]=j;sv('tw_fc_'+k,j)}}catch(e){fc[k]=st('tw_fc_'+k)}}
+function pts(t){const f=t.days.flatMap(d=>d.stops);f.forEach((s,k)=>{if(!s.sea){s.p=s.lat==null?null:[s.lat,s.lon];return}
+ let a=null,b=null;for(let x=k-1;x>=0;x--)if(!f[x].sea&&f[x].lat!=null){a=f[x];break}for(let x=k+1;x<f.length;x++)if(!f[x].sea&&f[x].lat!=null){b=f[x];break}
+ s.p=a&&b?[(a.lat+b.lat)/2,(a.lon+b.lon)/2]:a?[a.lat,a.lon]:b?[b.lat,b.lon]:null})}
+async function loadTrip(){busy='Loading forecasts…';render();pts(tr);const m={};tr.days.forEach(d=>d.stops.forEach(s=>{if(s.p)m[key(s.p)]=s.p}));
+ await Promise.all(Object.values(m).map(p=>load(p[0],p[1])));busy='';render()}
+function dd(s,date){const j=s.p&&fc[key(s.p)];if(!j)return null;const i=j.daily.time.indexOf(date);if(i<0)return null;const g=k=>j.daily[k][i];
+ return{ic:g('weather_code'),hi:g('temperature_2m_max'),lo:g('temperature_2m_min'),pop:g('precipitation_probability_max'),w:g('wind_speed_10m_max'),uv:g('uv_index_max'),sr:g('sunrise'),ss:g('sunset'),j}}
+const why=date=>date<iso(new Date())?'Past date':'Forecast opens '+fmtD(addD(date,-15));
+/* ---------- sharing / storage ---------- */
+const clean=t=>JSON.parse(JSON.stringify(t,(k,v)=>k=='c'||k=='p'||k=='idx'?undefined:v));
+const enc=t=>btoa(unescape(encodeURIComponent(JSON.stringify([t.name,t.days.map(d=>[d.date,d.stops.map(s=>[s.loc,s.lat,s.lon,s.from,s.to,s.sea?1:0,s.t?1:0])])]))));
+const dec=h=>{const[n,d]=JSON.parse(decodeURIComponent(escape(atob(h))));return{name:n,days:d.map(x=>({date:x[0],stops:x[1].map(s=>({loc:s[0],lat:s[1],lon:s[2],from:s[3],to:s[4],sea:!!s[5],t:s[6]}))}))}};
+const link=t=>location.href.split('#')[0]+'#t='+enc(t);
+function saveTrip(){const t=clean(tr);if(tr.idx==null){trips.push(t);cur=trips.length-1}else{trips[tr.idx]=t;cur=tr.idx}sv('tw_trips',trips);shared=false;tr=trips[cur];go('trip');loadTrip()}
+function openTrip(i){cur=i;tr=trips[i];shared=false;go('trip');loadTrip()}
+function editTrip(){tr=clean(tr);tr.idx=cur;go('review')}
+function delTrip(){if(confirm('Delete this trip?')){trips.splice(cur,1);sv('tw_trips',trips);go('list')}}
+function addStop(i){const d=tr.days[i],l=d.stops[d.stops.length-1];d.stops.push({loc:'',sea:false,lat:null,lon:null,t:1,from:Math.min(23,l.to+1),to:23});render()}
+function addDay(n){const a=tr.days,e=n<0?a[0]:a[a.length-1],s=e.stops[n<0?0:e.stops.length-1],x={date:addD(e.date,n),stops:[{...s,c:[],t:0,from:8,to:18}]};n<0?a.unshift(x):a.push(x);render()}
+function sf(i,j,k,v){const s=tr.days[i].stops[j];s[k]=+v;s.t=1}
+async function readIt(){const txt=$('#tx').value,sd=$('#sd').value,nm=$('#nm').value;if(!txt.trim()){toast('Paste an itinerary first');return}
+ const t=parse(txt,sd);if(nm)t.name=nm;busy='Looking up places…';render();
+ await Promise.all(t.days.flatMap(d=>d.stops).filter(s=>!s.sea).map(async s=>{s.c=await geo(s.loc);pick(s,0)}));
+ tr=t;tr.idx=null;busy='';go('review')}
+/* ---------- screens ---------- */
+function go(v,x,y){view=v;if(x!==undefined){di=x;si=y||0}render();scrollTo(0,0)}
+const hdr=(t,back,r='')=>`<div class="brand">Cruising with Banyan</div><header>${back?`<button class="ib" onclick="go('${back}')">‹</button>`:''}<h1>${esc(t)}</h1>${r}</header>`;
+const ub=()=>`<button class="ib" onclick="unit=unit=='F'?'C':'F';sv('tw_unit',unit);render()">°${unit=='F'?'C':'F'}</button>`;
+const op=v=>Array.from({length:24},(_,h)=>`<option value="${h}"${h==v?' selected':''}>${hr(h)}</option>`).join('');
+function render(){const a=$('#app');
+ if(busy){a.innerHTML=hdr('Cruising with Banyan'.length?'One moment':'')+`<div class="ctr">${busy}</div>`;return}
+ if(view=='list')a.innerHTML=hdr('My trips',0,ub())+`<div class="wrap">${trips.map((t,i)=>`<button class="card" onclick="openTrip(${i})"><div class="m"><div class="loc">${esc(t.name)}</div><div class="sub">${t.days.length} days · ${fmtD(t.days[0].date)} – ${fmtD(t.days[t.days.length-1].date)}</div></div><span class="lo">›</span></button>`).join('')||'<div class="ctr">No trips yet. Create one to see its weather.</div>'}<button class="pri" onclick="go('new')">＋ New trip</button></div>`;
+ if(view=='new')a.innerHTML=hdr('New trip','list')+`<div class="wrap"><div class="note">Paste a cruise itinerary exactly as you received it, or type one place per line for a road trip or land trip.</div><label>Trip name (optional)</label><input id="nm"><label>Start date (only needed if the itinerary has no dates)</label><input id="sd" type="date"><label>Itinerary</label><textarea id="tx" rows="10" placeholder="Day 1 - San Juan, Puerto Rico&#10;Departs 08:00 PM on Nov 07, 2026&#10;Day 2 - Philipsburg, St. Maarten&#10;…"></textarea><button class="pri" onclick="readIt()">Read itinerary</button></div>`;
+ if(view=='review')a.innerHTML=hdr(tr.idx==null?'Review trip':'Edit trip',tr.idx==null?'new':'trip')+`<div class="wrap"><label>Trip name</label><input value="${esc(tr.name)}" onchange="tr.name=this.value"><div class="row"><button class="sec" onclick="addDay(-1)">＋ Day before</button><button class="sec" onclick="addDay(1)">＋ Day after</button></div><div style="height:10px"></div>`+tr.days.map((d,i)=>`<div class="card col"><b>${fmtD(d.date)}</b><button class="ib x" onclick="tr.days.splice(${i},1);render()">✕</button>`+d.stops.map((s,j)=>`<div style="margin-top:6px"><input value="${esc(s.loc)}" placeholder="City or port" onchange="relocate(${i},${j},this.value)">${!s.sea&&s.c&&s.c.length>1?`<select onchange="pick(tr.days[${i}].stops[${j}],+this.value);render()">${s.c.map((c,k)=>`<option value="${k}"${k==s.i?' selected':''}>${esc(c.n)}</option>`).join('')}</select>`:''}${!s.sea&&s.lat==null?'<div class="wn">Place not found. Try another spelling.</div>':''}${s.sea?'<div class="sub">Sea day: uses the midpoint between the places around it.</div>':`<div class="row"><select onchange="sf(${i},${j},'from',this.value)">${op(s.from)}</select><select onchange="sf(${i},${j},'to',this.value)">${op(s.to)}</select></div>`}</div>`).join('')+`<button class="lnk" onclick="addStop(${i})">＋ Add another location</button></div>`).join('')+`<button class="pri" onclick="saveTrip()">Save trip</button></div>`;
+ if(view=='trip'){const sh=shared?`<button class="ib" onclick="shared=false;trips.push(clean(tr));cur=trips.length-1;sv('tw_trips',trips);toast('Saved');render()">Save</button>`:`<button class="ib" onclick="go('share')">⤴︎</button><button class="ib" onclick="editTrip()">✎</button><button class="ib" onclick="delTrip()">🗑</button>`;
+  a.innerHTML=hdr(tr.name,shared?0:'list',sh+ub())+`<div class="wrap">`+tr.days.map((d,i)=>{const r=d.stops.map(s=>({s,x:dd(s,d.date)})),one=d.stops.length==1,f=r[0];
+   const nm=d.stops.map(s=>s.sea?'At sea':s.loc.split(',')[0]).join(' → ');
+   const right=r.map(o=>o.x?`<div><span style="font-size:${one?26:18}px">${IC(o.x.ic)}</span> <span class="hi">${T(o.x.hi)}°</span>${one?` <span class="lo">${T(o.x.lo)}°</span>`:''}</div>`:'').join('')||'<span>⏳</span>';
+   const sub=(one&&tl(f.s)?'⚓ '+tl(f.s)+'<br>':'')+(f.x?(one?'💧 '+f.x.pop+'% · 💨 '+W(f.x.w):d.stops.length+' locations today'):why(d.date));
+   return`<button class="card${f.x?'':' na'}" onclick="go('day',${i})"><div class="d">${new Date(d.date+'T12:00:00').toLocaleDateString(undefined,{weekday:'short'})}<b>${+d.date.slice(8)}</b></div><div class="m"><div class="loc">${esc(nm)}</div><div class="sub">${sub}</div></div><div class="t">${right}</div></button>`}).join('')+`<div class="ctr" style="padding:8px">Tap a day for hourly details</div></div>`}
+ if(view=='day'){const d=tr.days[di],s=d.stops[Math.min(si,d.stops.length-1)],x=dd(s,d.date);
+  let b=d.stops.length>1?`<div class="seg">${d.stops.map((z,k)=>`<button class="${k==si?'on':''}" onclick="si=${k};render()">${k+1}. ${esc(z.loc.split(',')[0])}</button>`).join('')}</div>`:'';
+  if(!x)b+=`<div class="note" style="background:var(--wn);color:var(--wt)">${why(d.date)}. Forecasts reach about 16 days ahead.${tl(s)?'<br>⚓ In port: '+tl(s):''}</div>`;
+  else{const h=x.j.hourly,o=h.time.indexOf(d.date+'T00:00'),rows=Array.from({length:24},(_,k)=>{const n=o+k,ip=s.t&&k>=s.from&&k<=s.to;return o<0?'':`<div class="hr${ip?' inport':''}" id="h${k}"><span class="tm">${hr(k)}</span><span class="ic">${IC(h.weather_code[n])}</span><span class="tp">${T(h.temperature_2m[n])}°</span><span class="x">💧${h.precipitation_probability[n]??0}% · ${W(h.wind_speed_10m[n])}</span></div>`}).join('');
+   b+=`<div style="text-align:center;padding:8px"><div style="font-size:56px">${IC(x.ic)}</div><div style="font-size:34px;font-weight:700">${T(x.hi)}° <span class="lo">/ ${T(x.lo)}°</span></div></div>${s.sea?'<div class="note">At sea: forecast for the midpoint between the places around this day.</div>':''}<div class="grid"><div class="stat"><small>Rain</small><b>${x.pop??0}%</b></div><div class="stat"><small>Wind</small><b>${W(x.w)}</b></div><div class="stat"><small>UV</small><b>${Math.round(x.uv)}</b></div></div><div class="grid" style="grid-template-columns:1fr 1fr"><div class="stat"><small>Sunrise</small><b>${x.sr.slice(11)}</b></div><div class="stat"><small>Sunset</small><b>${x.ss.slice(11)}</b></div></div><h2>Hourly${tl(s)?' · ⚓ in port '+tl(s):''}</h2><div class="ctr" style="padding:0 0 6px;text-align:left;font-size:13px">${s.t?'Opens at your start time. Scroll for earlier and later hours; your hours are highlighted. Times are local.':'Scroll for the full 24 hours.'}</div><div class="hrs" id="hrs">${rows}</div>`}
+  a.innerHTML=hdr(s.sea?'At sea':s.loc.split(',')[0]+' · '+fmtD(d.date).replace(/^\w+,\s*/,''),'trip',ub())+`<div class="wrap">${b}</div>`;
+  const c=$('#hrs'),r=$('#h'+(s.t?s.from:7));if(c&&r)c.scrollTop=r.offsetTop-6}
+ if(view=='share'){const l=link(tr);a.innerHTML=hdr('Share trip','trip')+`<div class="wrap"><div class="note">The whole trip is inside this link. Anyone who opens it sees live forecasts. No account needed.</div><label>Link</label><input readonly value="${esc(l)}" onfocus="this.select()"><button class="pri" onclick="navigator.clipboard.writeText('${l}').then(()=>toast('Link copied'),()=>toast('Press and hold the link to copy'))">Copy link</button><button class="sec" onclick="navigator.share?navigator.share({title:tr.name,url:'${l}'}):toast('Use Copy link')">Share…</button></div>`}}
+/* ---------- start ---------- */
+if(location.hash.startsWith('#t=')){try{tr=dec(location.hash.slice(3));shared=true;view='trip';loadTrip()}catch(e){render()}}else render();
+</script></body></html>
